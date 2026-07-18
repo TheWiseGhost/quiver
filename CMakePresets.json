@@ -1,0 +1,38 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": { "QUIVER_WERROR": "ON" }
+    },
+    { "name": "release", "inherits": "base", "displayName": "Release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" } },
+    { "name": "native", "inherits": "base", "displayName": "Release tuned for this CPU",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "QUIVER_NATIVE": "ON" } },
+    { "name": "debug", "inherits": "base", "displayName": "Debug",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
+    { "name": "asan", "inherits": "base", "displayName": "AddressSanitizer + UBSan",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "QUIVER_SANITIZE": "address,undefined",
+                          "QUIVER_BUILD_BENCHMARKS": "OFF" } },
+    { "name": "tsan", "inherits": "base", "displayName": "ThreadSanitizer",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "QUIVER_SANITIZE": "thread",
+                          "QUIVER_BUILD_BENCHMARKS": "OFF" } }
+  ],
+  "buildPresets": [
+    { "name": "release", "configurePreset": "release" },
+    { "name": "native", "configurePreset": "native" },
+    { "name": "debug", "configurePreset": "debug" },
+    { "name": "asan", "configurePreset": "asan" },
+    { "name": "tsan", "configurePreset": "tsan" }
+  ],
+  "testPresets": [
+    { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
+    { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true } },
+    { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true } },
+    { "name": "tsan", "configurePreset": "tsan", "output": { "outputOnFailure": true },
+      "environment": { "TSAN_OPTIONS": "halt_on_error=1" } }
+  ]
+}
