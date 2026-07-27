@@ -1,0 +1,35 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "quiver-ann"
+version = "0.1.0"
+description = "SIMD-accelerated approximate nearest neighbor search (HNSW, SQ8, IVF-PQ) with a C++20 core"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Aditya Byju" }]
+dependencies = ["numpy>=1.22"]
+classifiers = [
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.scikit-build]
+minimum-version = "0.10"
+build-dir = "build/{wheel_tag}"
+wheel.packages = ["python/quiver"]
+wheel.py-api = "cp312"
+
+[tool.scikit-build.cmake.define]
+QUIVER_BUILD_PYTHON = "ON"
+QUIVER_BUILD_TESTS = "OFF"
+QUIVER_BUILD_BENCHMARKS = "OFF"
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
