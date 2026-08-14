@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: ${{ matrix.os }} / ${{ matrix.compiler }} / ${{ matrix.preset }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, compiler: gcc-14, cxx: g++-14, preset: release }
+          - { os: ubuntu-24.04, compiler: clang-18, cxx: clang++-18, preset: release }
+          - { os: ubuntu-24.04, compiler: clang-18, cxx: clang++-18, preset: asan }
+          - { os: ubuntu-24.04, compiler: clang-18, cxx: clang++-18, preset: tsan }
+          - { os: ubuntu-24.04-arm, compiler: gcc-14, cxx: g++-14, preset: release }  # NEON on Linux
+          - { os: macos-15, compiler: apple-clang, cxx: clang++, preset: release }
+          - { os: macos-15, compiler: apple-clang, cxx: clang++, preset: asan }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build ${{ matrix.compiler == 'gcc-14' && 'g++-14' || 'clang-18' }}
+      - name: Install tools (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }} -j 4
+      - name: Test
+        env:
+          # The TSan runtime needs a lower ASLR entropy on recent Linux kernels.
+          TSAN_OPTIONS: halt_on_error=1
+        run: |
+          if [ "${{ matrix.preset }}" = "tsan" ] && [ "$RUNNER_OS" = "Linux" ]; then
+            sudo sysctl vm.mmap_rnd_bits=28
+          fi
+          ctest --preset ${{ matrix.preset }} -j 4
+      - name: AVX2 kernels forced (x86 only)
+        if: matrix.preset == 'release' && runner.arch == 'X64'
+        run: QUIVER_SIMD=avx2 ./build/release/tests/quiver_tests --gtest_brief=1
+      - name: Scalar kernels forced
+        if: matrix.preset == 'release'
+        run: QUIVER_SIMD=scalar ./build/release/tests/quiver_tests --gtest_brief=1 --gtest_filter='-*Concurrency*'
+
+  fuzz:
+    name: libFuzzer (index loader)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build clang-18
+      - run: cmake -S . -B build/fuzz -G Ninja -DCMAKE_CXX_COMPILER=clang++-18 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQUIVER_BUILD_FUZZERS=ON -DQUIVER_BUILD_TESTS=OFF -DQUIVER_BUILD_BENCHMARKS=OFF
+      - run: cmake --build build/fuzz
+      - name: Fuzz the loader for 3 minutes
+        run: |
+          mkdir -p corpus
+          ./build/fuzz/fuzz/make_fuzz_corpus corpus
+          ./build/fuzz/fuzz/fuzz_hnsw_load -max_total_time=180 -rss_limit_mb=2048 corpus
+
+  python:
+    name: Python ${{ matrix.python }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install . pytest
+      - run: pytest -q python/tests
+
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y clang-format-18
+      - run: find include src tests bench fuzz python -name '*.h' -o -name '*.cc' | xargs clang-format-18 --dry-run --Werror
