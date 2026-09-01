@@ -206,7 +206,7 @@ std::shared_ptr<FileImage> FileImage::open(const std::string& path, IndexKind ki
     ~FdCloser() { ::close(fd); }
   } closer{fd};
 
-  struct stat st{};
+  struct stat st = {};
   QUIVER_CHECK(::fstat(fd, &st) == 0, "cannot stat '" + path + "': " + errno_text());
   QUIVER_CHECK(S_ISREG(st.st_mode), "'" + path + "' is not a regular file");
   const auto size = static_cast<std::size_t>(st.st_size);
