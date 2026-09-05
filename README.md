@@ -1,5 +1,7 @@
 # Quiver
 
+[![CI](https://github.com/TheWiseGhost/quiver/actions/workflows/ci.yml/badge.svg)](https://github.com/TheWiseGhost/quiver/actions/workflows/ci.yml)
+
 **A vector search engine written from scratch in C++20**: HNSW and IVF-PQ indexes,
 hand-written NEON/AVX2 SIMD kernels, lock-free concurrent search, zero-copy `mmap` persistence,
 and Python bindings.
